@@ -7,7 +7,7 @@ namespace HealthChecks.Publisher.Splunk.DependencyInjection
 {
     public static class SplunkHealthCheckBuilderExtensions
 {
-    const string NAME = "seq";
+    const string NAME = "splunk";
     /// <summary>
     ///     Add a health check publisher for Seq.
     /// </summary>

@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Reflection;
 using System.Text;
 using System.Threading;
@@ -68,16 +69,36 @@ namespace HealthChecks.Publisher.Splunk
             try
             {
                 var httpClient = _httpClientFactory();
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Splunk", _options.Token);
+                if (!httpClient.DefaultRequestHeaders.Contains("X-Splunk-Request-Channel"))
+                {
+                    httpClient.DefaultRequestHeaders.Add("X-Splunk-Request-Channel", Guid.NewGuid().ToString());
+                }
 
-                var pushMessage = new HttpRequestMessage(HttpMethod.Post, $"{_options.Endpoint}/api/events/raw?apiKey={_options.Token}");
-                pushMessage.Content = new StringContent(json, Encoding.UTF8, "application/json");
-
-                (await httpClient.SendAsync(pushMessage))
-                    .EnsureSuccessStatusCode();
+                var request = new EventCollectorRequest(_options.Endpoint, json);
+                var response = (await httpClient.SendAsync(request).ConfigureAwait(false)).EnsureSuccessStatusCode();
             }
             catch (Exception ex)
             {
                 Trace.WriteLine($"Exception is throwed publishing metrics to Seq with message: {ex.Message}");
+            }
+        }
+       
+        private class EventCollectorRequest : HttpRequestMessage
+        {
+            internal EventCollectorRequest(string splunkHost, string jsonPayLoad, string uri = "services/collector")
+            {
+                var hostUrl = $@"{splunkHost}/{uri}";
+
+                if (splunkHost.Contains("services/collector"))
+                {
+                    hostUrl = $@"{splunkHost}";
+                }
+
+                var stringContent = new StringContent(jsonPayLoad, Encoding.UTF8, "application/json");
+                RequestUri = new Uri(hostUrl);
+                Content = stringContent;
+                Method = HttpMethod.Post;
             }
         }
         private class RawEvents
